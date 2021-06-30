@@ -19,6 +19,10 @@ import (
 const multipartUploadThreshold = 5 * 1024 * 1024
 const defaultConcurrentUploadNumber = 5
 
+var downloadClient = http.Client{
+	Timeout: time.Duration(5 * time.Second),
+}
+
 type VodUploadClient struct {
 	SecretId  string
 	SecretKey string
@@ -193,7 +197,7 @@ func (p *VodUploadClient) uploadCos(client *cos.Client, localPath string, cosPat
 }
 
 func (p *VodUploadClient) uploadCosFromUrl(client *cos.Client, url string, cosPath string, concurrentUploadNumber uint64) error {
-	r, err := http.Get(url)
+	r, err := downloadClient.Get(url)
 	if err != nil {
 		return err
 	}
