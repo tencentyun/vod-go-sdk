@@ -24,14 +24,26 @@ const defaultPartSize = 1
 const autoPartSizeFileSizeThreshold = 5 * 1024 * 1024 * 1024
 
 type VodUploadClient struct {
-	SecretId  string
-	SecretKey string
-	Token     string
-	Timeout   int64
-	Transport http.RoundTripper
+	SecretId         string
+	SecretKey        string
+	Token            string
+	Timeout          int64
+	Transport        http.RoundTripper
+	ProgressListener cos.ProgressListener
 }
 
-func (p *VodUploadClient) Upload(region string, request *VodUploadRequest) (*VodUploadResponse, error) {
+type UploadOption func(p *VodUploadClient)
+
+func WithListener(listener cos.ProgressListener) UploadOption {
+	return func(p *VodUploadClient) {
+		p.ProgressListener = listener
+	}
+}
+
+func (p *VodUploadClient) Upload(region string, request *VodUploadRequest, opts ...UploadOption) (*VodUploadResponse, error) {
+	for _, opt := range opts {
+		opt(p)
+	}
 	return p.doUpload(region, request, false)
 }
 
@@ -178,6 +190,9 @@ func (p *VodUploadClient) uploadCos(client *cos.Client, localPath string, cosPat
 				ContentLength: stat.Size(),
 			},
 		}
+		if p.ProgressListener !=  nil {
+			putOpt.Listener = p.ProgressListener
+		}
 		_, err = client.Object.Put(context.Background(), cosPath, file, putOpt)
 		if err != nil {
 			return err
@@ -191,6 +206,9 @@ func (p *VodUploadClient) uploadCos(client *cos.Client, localPath string, cosPat
 			OptIni:         nil,
 			PartSize:       int64(partSize),
 			ThreadPoolSize: int(concurrentUploadNumber),
+		}
+		if p.ProgressListener !=  nil {
+			multiOpt.OptIni.Listener = p.ProgressListener
 		}
 		_, _, err = client.Object.MultiUpload(context.Background(), cosPath, localPath, multiOpt)
 		if err != nil {
@@ -215,6 +233,9 @@ func (p *VodUploadClient) uploadCosFromUrl(client *cos.Client, url string, cosPa
 		ObjectPutHeaderOptions: &cos.ObjectPutHeaderOptions{
 			ContentLength: r.ContentLength,
 		},
+	}
+	if p.ProgressListener !=  nil {
+		putOpt.Listener = p.ProgressListener
 	}
 	_, err = client.Object.Put(context.Background(), cosPath, r.Body, putOpt)
 	if err != nil {

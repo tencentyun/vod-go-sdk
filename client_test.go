@@ -1,6 +1,7 @@
 package vod
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -8,9 +9,24 @@ import (
 	"testing"
 
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
+	"github.com/tencentyun/cos-go-sdk-v5"
 )
 
 const region = "ap-guangzhou"
+
+type DefaultListener struct {
+}
+
+// 自定义进度回调，需要实现 ProgressChangedCallback 方法
+func (l *DefaultListener) ProgressChangedCallback(event *cos.ProgressEvent) {
+	switch event.EventType {
+	case cos.ProgressDataEvent:
+		fmt.Printf("\r[ConsumedBytes/TotalBytes: %d/%d, %d%%]",
+			event.ConsumedBytes, event.TotalBytes, event.ConsumedBytes*100/event.TotalBytes)
+	case cos.ProgressFailedEvent:
+		fmt.Printf("\nTransfer Failed: %v", event.Err)
+	}
+}
 
 func getClient() *VodUploadClient {
 	client := &VodUploadClient{}
@@ -102,6 +118,22 @@ func TestUploadNormal(t *testing.T) {
 	req.MediaFilePath = common.StringPtr("video/Wildlife.mp4")
 	req.CoverFilePath = common.StringPtr("video/Wildlife-cover.png")
 	rsp, err := client.Upload(region, req)
+	if err != nil {
+		t.Error(err)
+	}
+	t.Log(*rsp.Response.FileId)
+	t.Log(*rsp.Response.MediaUrl)
+	t.Log(*rsp.Response.CoverUrl)
+}
+
+func TestUploadWithProgressCallback(t *testing.T) {
+	client := getClient()
+	req := NewVodUploadRequest()
+	req.MediaFilePath = common.StringPtr("video/Wildlife.mp4")
+	req.CoverFilePath = common.StringPtr("video/Wildlife-cover.png")
+	req.SubAppId = common.Uint64Ptr(1500012371)
+	listener := &DefaultListener{}
+	rsp, err := client.Upload(region, req, WithListener(listener))
 	if err != nil {
 		t.Error(err)
 	}
