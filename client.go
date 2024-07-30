@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
@@ -135,10 +135,10 @@ func (p *VodUploadClient) doUpload(region string, request *VodUploadRequest, isF
 		}
 
 		for _, segmentFilePath := range segmentFilePathList {
-			cosDir := path.Dir(*mediaStoragePath)
-			parentPath := path.Dir(*request.MediaFilePath)
+			cosDir := filepath.Dir(*mediaStoragePath)
+			parentPath := filepath.Dir(*request.MediaFilePath)
 			segmentRelativePath := segmentFilePath[len(parentPath):]
-			segmentStoragePath := path.Join(cosDir, segmentRelativePath)
+			segmentStoragePath := filepath.Join(cosDir, segmentRelativePath)
 
 			if err = p.uploadCos(cosClient, segmentFilePath, segmentStoragePath[1:], *request.ConcurrentUploadNumber); err != nil {
 				return nil, err
@@ -351,7 +351,7 @@ func (p *VodUploadClient) parseManifest(apiClient *v20180717.Client, manifestFil
 	segmentUrls = parseStreamingManifestResponse.Response.MediaSegmentSet
 	for _, segmentUrl := range segmentUrls {
 		mediaType := GetFileType(*segmentUrl)
-		mediaFilePath := path.Join(path.Dir(manifestFilePath), *segmentUrl)
+		mediaFilePath := filepath.Join(filepath.Dir(manifestFilePath), *segmentUrl)
 		*segmentFilePathList = append(*segmentFilePathList, mediaFilePath)
 
 		if IsManifestMediaType(mediaType) {
